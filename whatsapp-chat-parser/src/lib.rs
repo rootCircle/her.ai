@@ -11,9 +11,35 @@ pub enum Author {
 
 #[derive(Debug)]
 pub struct WhatsAppChatMessage {
-    message: String,
-    author: Author,
-    datetime: NaiveDateTime,
+    pub message: String,
+    pub author: Author,
+    pub datetime: NaiveDateTime,
+}
+
+fn parse_datetime_from_multiple_formats(datetime_str: &str) -> NaiveDateTime {
+    // List of date formats to try
+    let date_formats = [
+        "%-m/%-d/%y, %-I:%M %p",        // 4/22/24, 12:30 PM
+        "%-m/%-d/%Y, %-I:%M %p",        // 4/22/24, 12:30 PM
+        "%-m-%-d-%y %-I:%M %p",         // 04-22-24 12:30 PM
+        "%-m-%-d-%Y %-I:%M %p",         // 04-22-2024 12:30 PM
+        "%Y-%-m-%-d %-I:%M %p",         // 2024-04-22 12:30 PM
+        "%Y/%-m/%-d %-I:%M %p",         // 2024/04/22 12:30 PM
+        "%-d/%-m/%Y, %-I:%M %p",        // 22/4/2024, 12:30 PM
+        "%-d/%-m/%y, %-I:%M %p",        // 22/4/24, 12:30 PM
+        "%-d-%-m-%Y %-I:%M %p",         // 04-22-2024 12:30 PM
+        "%-d-%-m-%y %-I:%M %p",         // 04-22-24 12:30 PM
+    ];
+
+    // Attempt to parse datetime with each format
+    for format in &date_formats {
+        if let Ok(datetime) = NaiveDateTime::parse_from_str(datetime_str, *format) {
+            return datetime;
+        }
+    }
+
+    // If none of the formats succeed, return default datetime
+    NaiveDateTime::default()
 }
 
 pub fn parse_chats_log(filename: &str) -> io::Result<Vec<WhatsAppChatMessage>> {
@@ -58,7 +84,7 @@ fn parse_message(line: String) -> Option<WhatsAppChatMessage> {
     if let Some(mat) = result.next() {
         return Some(WhatsAppChatMessage {
             datetime: mat.name("datetime").map_or(NaiveDateTime::default(), |m| {
-                NaiveDateTime::parse_from_str(m.as_str(), "%-m/%-d/%y, %-I:%M %p").unwrap()
+                parse_datetime_from_multiple_formats(m.as_str())
             }),
             author: mat
                 .name("author")
