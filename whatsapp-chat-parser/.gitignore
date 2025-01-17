@@ -3,3 +3,8 @@ WhatsApp Chat*.txt
 chat.txt
 /.idea/
 /.vscode/
+
+# Benchmark
+flamegraph.svg
+perf.data.old
+perf.data
