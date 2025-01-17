@@ -1,6 +1,9 @@
 /target
 WhatsApp Chat*.txt
-chat.txt
+chat*.txt
+# chat files
+*.txt
+
 /.idea/
 /.vscode/
 
