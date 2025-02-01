@@ -203,40 +203,50 @@ fn analyze_sentiment(message: &str) -> String {
 }
 
 fn detect_silence(chat: &[WhatsAppChatMessage], silence_threshold: i64) {
-    let mut user_silence_durations: HashMap<
-        String,
-        Vec<(WhatsAppChatMessage, WhatsAppChatMessage, i64)>,
-    > = HashMap::new();
+    // Group messages per user.
+    let mut user_messages: HashMap<String, Vec<&WhatsAppChatMessage>> = HashMap::new();
 
-    for window in chat.windows(2) {
-        let msg1 = &window[0];
-        let msg2 = &window[1];
-
-        if let (Author::User(user1), Author::User(user2)) = (&msg1.author, &msg2.author) {
-            if user1 == user2 {
-                let time_diff = msg2
-                    .datetime
-                    .signed_duration_since(msg1.datetime)
-                    .num_seconds();
-                if time_diff > silence_threshold {
-                    user_silence_durations
-                        .entry(user1.clone())
-                        .or_default()
-                        .push((msg1.clone(), msg2.clone(), time_diff));
-                }
-            }
+    for msg in chat {
+        if let Author::User(user) = &msg.author {
+            user_messages.entry(user.clone()).or_default().push(msg);
         }
     }
 
-    for (user, mut silences) in user_silence_durations {
-        silences.sort_by(|a, b| b.2.cmp(&a.2));
-        if let Some((msg1, msg2, time_diff)) = silences.first() {
+    // For each user, sort messages by datetime and then compute the gap between consecutive messages.
+    for (user, mut msgs) in user_messages {
+        msgs.sort_by_key(|m| m.datetime);
+
+        let mut longest_gap: i64 = 0;
+        let mut gap_pair: Option<(&WhatsAppChatMessage, &WhatsAppChatMessage)> = None;
+
+        // Iterate over pairs of consecutive messages.
+        for win in msgs.windows(2) {
+            let time_diff = win[1]
+                .datetime
+                .signed_duration_since(win[0].datetime)
+                .num_seconds();
+
+            // Check if this gap qualifies as a conversation break.
+            if time_diff > silence_threshold && time_diff > longest_gap {
+                longest_gap = time_diff;
+                gap_pair = Some((win[0], win[1]));
+            }
+        }
+
+        // Report the results.
+        if let Some((msg1, msg2)) = gap_pair {
             println!(
-                "Longest silence for {}: {} to {} ({} hours)",
+                "Longest conversation gap for {}: from {} to {} ({} hours)",
                 user.green(),
                 msg1.datetime,
                 msg2.datetime,
-                time_diff / 3600
+                longest_gap / 3600
+            );
+        } else {
+            println!(
+                "No conversation gap found for {} (no gap exceeded {} seconds)",
+                user.green(),
+                silence_threshold
             );
         }
     }

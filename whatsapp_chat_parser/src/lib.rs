@@ -98,7 +98,6 @@ fn parse_datetime(datetime_str: &str, cached_format: &mut Option<String>) -> Nai
             return datetime;
         }
     }
-
     NaiveDateTime::default()
 }
 
@@ -150,7 +149,7 @@ pub fn parse_chats_log(filename: &str) -> io::Result<Vec<WhatsAppChatMessage>> {
     let reader = BufReader::new(file);
 
     let regex = Regex::new(
-        r"(?ms)^(?P<datetime>[0-9/-]+,?\s[^-]+) - (?:(?P<author>[^:]+): )?(?P<message>.*)$",
+        r"(?ms)^(?P<datetime>[0-9/-]+,?\s[^\r\n-]+) - (?:(?P<author>[^\r\n:]+): )?(?P<message>.*)$",
     )
     .unwrap();
 
