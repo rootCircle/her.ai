@@ -1,12 +1,12 @@
 use chrono::{NaiveDate, Timelike};
 use colored::Colorize;
-use std::collections::HashMap;
 use std::io;
 use std::time::Instant;
+use std::{collections::HashMap, env};
 use vader_sentimental::SentimentIntensityAnalyzer;
-use whatsapp_chat_parser::{parse_chats_log, Author, WhatsAppChatMessage};
+use whatsapp_chat_parser::{parse_chats_log, Author, Message, WhatsAppChatMessage};
 
-const WHATSAPP_FILENAME: &str = "chata.txt";
+const DEFAULT_WHATSAPP_FILENAME: &str = "chat.txt";
 const DISPLAY_CHATS: bool = false;
 const MINIMUM_USER_ACTIVITY_PER_DAY_CHAT_COUNT: usize = 100;
 const MINIMUM_CONVERSATION_FREQUENCY_PER_DAY_CHAT_COUNT: usize = 150;
@@ -24,7 +24,12 @@ struct SentimentData {
 
 fn main() -> io::Result<()> {
     let start_time = Instant::now();
-    let chat = parse_chats_log(WHATSAPP_FILENAME)?;
+    let args: Vec<String> = env::args().collect();
+    let filename = args
+        .get(1)
+        .map_or(DEFAULT_WHATSAPP_FILENAME, String::as_str);
+
+    let chat = parse_chats_log(filename)?;
 
     let parse_duration = start_time.elapsed();
 
@@ -52,44 +57,56 @@ fn main() -> io::Result<()> {
             let user_hours = active_hours.entry(username.clone()).or_default();
             *user_hours.entry(hour).or_insert(0) += 1;
 
-            message_lengths.push(msg.message.len());
+            if let Message::Conversation(conversation) = &msg.message {
+                message_lengths.push(conversation.len());
 
-            let sentiment = analyze_sentiment(&msg.message);
-            let entry = sentiment_analysis.entry(username.clone()).or_default();
+                let sentiment = analyze_sentiment(conversation);
+                let entry = sentiment_analysis.entry(username.clone()).or_default();
 
-            match sentiment.as_str() {
-                "Positive" => entry.positive_count += 1,
-                "Negative" => entry.negative_count += 1,
-                "Neutral" => entry.neutral_count += 1,
-                _ => {}
-            };
+                match sentiment.as_str() {
+                    "Positive" => entry.positive_count += 1,
+                    "Negative" => entry.negative_count += 1,
+                    "Neutral" => entry.neutral_count += 1,
+                    _ => {}
+                };
 
-            if sentiment == "Positive"
-                && (entry.most_positive_message.is_none()
-                    || analyze_sentiment(&entry.most_positive_message.clone().unwrap())
-                        < analyze_sentiment(&msg.message))
-            {
-                entry.most_positive_message = Some(msg.message.clone());
+                if sentiment == "Positive"
+                    && (entry.most_positive_message.is_none()
+                        || analyze_sentiment(&entry.most_positive_message.clone().unwrap())
+                            < analyze_sentiment(conversation))
+                {
+                    entry.most_positive_message = Some(conversation.clone());
+                }
+
+                if sentiment == "Negative"
+                    && (entry.most_negative_message.is_none()
+                        || analyze_sentiment(&entry.most_negative_message.clone().unwrap())
+                            > analyze_sentiment(conversation))
+                {
+                    entry.most_negative_message = Some(conversation.clone());
+                };
             }
 
-            if sentiment == "Negative"
-                && (entry.most_negative_message.is_none()
-                    || analyze_sentiment(&entry.most_negative_message.clone().unwrap())
-                        > analyze_sentiment(&msg.message))
-            {
-                entry.most_negative_message = Some(msg.message.clone());
-            };
-
             if DISPLAY_CHATS {
-                println!(
-                    "{} {}: {}",
-                    msg.datetime
-                        .format("[%-m/%-d/%y, %-I:%M:%S %p]")
-                        .to_string()
-                        .magenta(),
-                    username.green(),
-                    msg.message
-                );
+                match &msg.message {
+                    Message::Conversation(conversation)
+                    | Message::EditedConversation(conversation) => {
+                        println!(
+                            "{} {}: {}",
+                            msg.datetime
+                                .format("[%-m/%-d/%y, %-I:%M:%S %p]")
+                                .to_string()
+                                .magenta(),
+                            username.green(),
+                            conversation
+                        );
+                    }
+                    // Suppress Media Omitted/System messages
+                    Message::MediaOmitted
+                    | Message::PinnedMessage
+                    | Message::E2EEncryptedMessage
+                    | Message::TimerUpdatedMessage => {}
+                }
             }
         }
     }
@@ -186,31 +203,42 @@ fn analyze_sentiment(message: &str) -> String {
 }
 
 fn detect_silence(chat: &[WhatsAppChatMessage], silence_threshold: i64) {
-    let mut silence_durations = Vec::new();
+    let mut user_silence_durations: HashMap<
+        String,
+        Vec<(WhatsAppChatMessage, WhatsAppChatMessage, i64)>,
+    > = HashMap::new();
 
     for window in chat.windows(2) {
         let msg1 = &window[0];
         let msg2 = &window[1];
-        let time_diff = msg2
-            .datetime
-            .signed_duration_since(msg1.datetime)
-            .num_seconds();
 
-        if time_diff > silence_threshold {
-            silence_durations.push((msg1, msg2, time_diff));
+        if let (Author::User(user1), Author::User(user2)) = (&msg1.author, &msg2.author) {
+            if user1 == user2 {
+                let time_diff = msg2
+                    .datetime
+                    .signed_duration_since(msg1.datetime)
+                    .num_seconds();
+                if time_diff > silence_threshold {
+                    user_silence_durations
+                        .entry(user1.clone())
+                        .or_default()
+                        .push((msg1.clone(), msg2.clone(), time_diff));
+                }
+            }
         }
     }
 
-    silence_durations.sort_by(|a, b| b.2.cmp(&a.2));
-
-    for (i, (msg1, msg2, time_diff)) in silence_durations.iter().take(5).enumerate() {
-        println!(
-            "Top {} longest silence: {} to {} ({} hours)",
-            i + 1,
-            msg1.datetime,
-            msg2.datetime,
-            time_diff / 3600
-        );
+    for (user, mut silences) in user_silence_durations {
+        silences.sort_by(|a, b| b.2.cmp(&a.2));
+        if let Some((msg1, msg2, time_diff)) = silences.first() {
+            println!(
+                "Longest silence for {}: {} to {} ({} hours)",
+                user.green(),
+                msg1.datetime,
+                msg2.datetime,
+                time_diff / 3600
+            );
+        }
     }
 }
 
@@ -219,7 +247,11 @@ fn analyze_user_activity(
 ) -> HashMap<String, HashMap<NaiveDate, usize>> {
     chat.iter().fold(HashMap::new(), |mut acc, msg| {
         let date = msg.datetime;
-        *acc.entry(msg.author.to_string())
+        let msg_author = match &msg.author {
+            Author::System => "",
+            Author::User(username) => username,
+        };
+        *acc.entry(msg_author.to_string())
             .or_default()
             .entry(date.into())
             .or_insert(0) += 1;
@@ -238,7 +270,11 @@ fn analyze_conversation_frequency(chat: &[WhatsAppChatMessage]) -> HashMap<Strin
 fn analyze_active_hours(chat: &[WhatsAppChatMessage]) -> HashMap<String, HashMap<u32, usize>> {
     chat.iter().fold(HashMap::new(), |mut acc, msg| {
         let hour = msg.datetime.hour();
-        *acc.entry(msg.author.to_string())
+        let msg_author = match &msg.author {
+            Author::System => "",
+            Author::User(username) => username,
+        };
+        *acc.entry(msg_author.to_string())
             .or_default()
             .entry(hour)
             .or_insert(0) += 1;
