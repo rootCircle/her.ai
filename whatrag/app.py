@@ -2,7 +2,6 @@ from langchain_community.chat_loaders.whatsapp import WhatsAppChatLoader
 from typing import List
 
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.chat_loaders.base import ChatSession
 from langchain_community.chat_loaders.utils import (
     map_ai_messages,
     merge_chat_runs,
@@ -12,18 +11,18 @@ from langchain_community.llms import Ollama
 
 
 loader = WhatsAppChatLoader(
-    path="./chat2.txt",
+    path="./chat.txt",
 )
 
 raw_messages = loader.lazy_load()
 # Merge consecutive messages from the same sender into a single message
 merged_messages = merge_chat_runs(raw_messages)
 # Convert messages from "Dr. Feather" to AI messages
-messages: List[ChatSession] = list(
-    map_ai_messages(merged_messages, sender="Saket (TSEC, CS)")
+messages = list(
+    map_ai_messages(merged_messages, sender="Dr. Feather")
 )
 
-# print(messages)
+print(messages)
 
 # llm = ChatGoogleGenerativeAI(
 #     model="gemini-pro",

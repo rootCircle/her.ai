@@ -14,3 +14,6 @@ wheels/
 
 # envs
 .env
+
+# Embeddings
+chat_embeddings/
