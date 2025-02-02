@@ -1,0 +1,3 @@
+[submodule "ai-clone-whatsapp"]
+	path = ai-clone-whatsapp
+	url = https://github.com/kinggongzilla/ai-clone-whatsapp.git
