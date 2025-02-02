@@ -19,9 +19,9 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 # Configuration constants
 DEFAULT_MODEL = "llama3.2"
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
-RETRIEVAL_K = 5
+CHUNK_SIZE = 5000
+CHUNK_OVERLAP = 400
+RETRIEVAL_K = 15
 
 
 class WhatsAppChatSimulator:

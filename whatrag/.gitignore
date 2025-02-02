@@ -17,3 +17,6 @@ wheels/
 
 # Embeddings
 chat_embeddings/
+
+# Chats
+Whatsapp_Chats/
