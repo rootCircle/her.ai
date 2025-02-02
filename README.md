@@ -2,6 +2,14 @@
 
 This project aims to build a chat AI that mimics the communication style and behavior of a specific person (let's call them Person X) based on their chat history. Users can interact with the AI through conversation prompts, and the AI will respond in a way that reflects Person X's characteristic tone, vocabulary, and conversational patterns.
 
+## Setup
+
+```bash
+git clone --recursive git@github.com:rootCircle/hear.ai.git
+git submodule update --init
+
+```
+
 ## Approach
 
 The approach will leverage a combination of deep learning techniques to achieve this goal:
