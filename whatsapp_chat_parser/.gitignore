@@ -6,6 +6,7 @@ chat*.txt
 
 # preprocessed chats
 *.json
+/data/
 
 /.idea/
 /.vscode/
