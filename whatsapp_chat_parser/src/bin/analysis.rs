@@ -4,7 +4,9 @@ use std::io;
 use std::time::Instant;
 use std::{collections::HashMap, env};
 use vader_sentimental::SentimentIntensityAnalyzer;
-use whatsapp_chat_parser::{parse_chats_log, Author, Message, WhatsAppChatMessage};
+use whatsapp_chat_parser::{
+    get_unique_author, parse_chats_log, Author, Message, WhatsAppChatMessage,
+};
 
 const DEFAULT_WHATSAPP_FILENAME: &str = "chat.txt";
 const DISPLAY_CHATS: bool = false;
@@ -33,35 +35,41 @@ fn main() -> io::Result<()> {
 
     let parse_duration = start_time.elapsed();
 
-    let mut user_message_count: HashMap<String, usize> = HashMap::new();
-    let mut user_activity_per_day: HashMap<String, HashMap<String, usize>> = HashMap::new();
-    let mut active_hours: HashMap<String, HashMap<u32, usize>> = HashMap::new();
+    let authors = get_unique_author(&chat);
+
+    for author in authors {
+        println!("{:?}", author);
+    }
+
+    let mut user_message_count: HashMap<&str, usize> = HashMap::new();
+    let mut user_activity_per_day: HashMap<&str, HashMap<String, usize>> = HashMap::new();
+    let mut active_hours: HashMap<&str, HashMap<u32, usize>> = HashMap::new();
     let mut message_lengths: Vec<usize> = Vec::new();
 
     let user_activity = analyze_user_activity(&chat);
     let conversation_frequency = analyze_conversation_frequency(&chat);
     let active_hours_per_user = analyze_active_hours(&chat);
 
-    let mut sentiment_analysis: HashMap<String, SentimentData> = HashMap::new();
+    let mut sentiment_analysis: HashMap<&str, SentimentData> = HashMap::new();
 
     for msg in &chat {
         if let Author::User(username) = &msg.author {
-            *user_message_count.entry(username.clone()).or_insert(0) += 1;
+            *user_message_count.entry(username).or_insert(0) += 1;
 
             let date = msg.datetime.date();
 
-            let user_activity_per_day = user_activity_per_day.entry(username.clone()).or_default();
+            let user_activity_per_day = user_activity_per_day.entry(username).or_default();
             *user_activity_per_day.entry(date.to_string()).or_insert(0) += 1;
 
             let hour = msg.datetime.hour();
-            let user_hours = active_hours.entry(username.clone()).or_default();
+            let user_hours = active_hours.entry(username).or_default();
             *user_hours.entry(hour).or_insert(0) += 1;
 
             if let Message::Conversation(conversation) = &msg.message {
                 message_lengths.push(conversation.len());
 
                 let sentiment = analyze_sentiment(conversation);
-                let entry = sentiment_analysis.entry(username.clone()).or_default();
+                let entry = sentiment_analysis.entry(username).or_default();
 
                 match sentiment.as_str() {
                     "Positive" => entry.positive_count += 1,
@@ -204,11 +212,11 @@ fn analyze_sentiment(message: &str) -> String {
 
 fn detect_silence(chat: &[WhatsAppChatMessage], silence_threshold: i64) {
     // Group messages per user.
-    let mut user_messages: HashMap<String, Vec<&WhatsAppChatMessage>> = HashMap::new();
+    let mut user_messages: HashMap<&str, Vec<&WhatsAppChatMessage>> = HashMap::new();
 
     for msg in chat {
         if let Author::User(user) = &msg.author {
-            user_messages.entry(user.clone()).or_default().push(msg);
+            user_messages.entry(user).or_default().push(msg);
         }
     }
 
@@ -252,16 +260,14 @@ fn detect_silence(chat: &[WhatsAppChatMessage], silence_threshold: i64) {
     }
 }
 
-fn analyze_user_activity(
-    chat: &[WhatsAppChatMessage],
-) -> HashMap<String, HashMap<NaiveDate, usize>> {
+fn analyze_user_activity(chat: &[WhatsAppChatMessage]) -> HashMap<&str, HashMap<NaiveDate, usize>> {
     chat.iter().fold(HashMap::new(), |mut acc, msg| {
         let date = msg.datetime;
         let msg_author = match &msg.author {
             Author::System => "",
             Author::User(username) => username,
         };
-        *acc.entry(msg_author.to_string())
+        *acc.entry(msg_author)
             .or_default()
             .entry(date.into())
             .or_insert(0) += 1;
@@ -277,17 +283,14 @@ fn analyze_conversation_frequency(chat: &[WhatsAppChatMessage]) -> HashMap<Strin
     })
 }
 
-fn analyze_active_hours(chat: &[WhatsAppChatMessage]) -> HashMap<String, HashMap<u32, usize>> {
+fn analyze_active_hours(chat: &[WhatsAppChatMessage]) -> HashMap<&str, HashMap<u32, usize>> {
     chat.iter().fold(HashMap::new(), |mut acc, msg| {
         let hour = msg.datetime.hour();
         let msg_author = match &msg.author {
             Author::System => "",
             Author::User(username) => username,
         };
-        *acc.entry(msg_author.to_string())
-            .or_default()
-            .entry(hour)
-            .or_insert(0) += 1;
+        *acc.entry(msg_author).or_default().entry(hour).or_insert(0) += 1;
         acc
     })
 }
