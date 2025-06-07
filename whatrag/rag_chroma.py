@@ -20,7 +20,7 @@ CHUNK_OVERLAP = 400  # Overlap between text chunks
 VECTOR_SEARCH_K = 15  # Number of similar chunks to retrieve during search
 
 SENDER_NAME = "Himan >_<"  # Sender name for the context and responses
-RESPONDER_NAME = "Eeshika PGS"  # Responder name in the final answer
+RESPONDER_NAME = "her_name"  # Responder name in the final answer
 
 # Initialize the LLM with model constants
 llm = ChatOpenAI(model=MODEL_NAME, temperature=0, max_tokens=None, timeout=None)

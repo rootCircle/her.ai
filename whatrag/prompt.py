@@ -13,7 +13,7 @@ from dotenv import load_dotenv
 load_dotenv()
 # Define constants for various parameters
 SENDER_NAME = "Himan >_<"
-RESPONDER_NAME = "Eeshika PGS"
+RESPONDER_NAME = "her_name"
 CHAT_FILENAME = "./Whatsapp_Chats/chate.txt"
 MODEL_NAME = "gemini-2.0-flash-exp"
 TEMPERATURE = 0
