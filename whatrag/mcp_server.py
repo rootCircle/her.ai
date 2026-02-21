@@ -1,76 +1,23 @@
-import re
 import os
 import anyio
+from typing import Any
 from mcp import types
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-
-CHAT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Whatsapp_Chats")
-SENDER_NAME = os.environ.get("SENDER_NAME", "")
-
-MSG_PATTERN = re.compile(
-    r"^(\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*[ap]m)\s*-\s*(.+?):\s*(.+)$",
-    re.IGNORECASE,
+from chat_utils import (
+    CHAT_DIR,
+    parse_whatsapp_chat,
+    detect_participants,
+    detect_responder,
 )
 
-SKIP_PHRASES = {
-    "<media omitted>",
-    "you deleted this message",
-    "this message was deleted",
-    "messages and calls are end-to-end encrypted",
-    "null",
-}
+SENDER_NAME = os.environ.get("SENDER_NAME", "")
+CHAT_FILE = os.environ.get("CHAT_FILE", "")  # Optional: specific chat file to use
 
 MAX_HISTORY_MESSAGES = 400
 MAX_STYLE_SAMPLES = 60
 
 session_messages: list[tuple[str, str]] = []
-
-
-def parse_whatsapp_chat(filepath: str) -> list[tuple[str, str]]:
-    messages: list[tuple[str, str]] = []
-    current_sender: str | None = None
-    current_text: str | None = None
-
-    with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n")
-            match = MSG_PATTERN.match(line)
-            if match:
-                if current_sender and current_text:
-                    messages.append((current_sender, current_text.strip()))
-                current_sender = match.group(2)
-                current_text = match.group(3)
-            elif current_sender:
-                current_text += "\n" + line
-
-    if current_sender and current_text:
-        messages.append((current_sender, current_text.strip()))
-
-    return [
-        (sender, text)
-        for sender, text in messages
-        if not any(skip in text.lower() for skip in SKIP_PHRASES)
-    ]
-
-
-def detect_participants(parsed: list[tuple[str, str]]) -> list[str]:
-    seen: dict[str, int] = {}
-    for sender, _ in parsed:
-        seen[sender] = seen.get(sender, 0) + 1
-    return sorted(seen.keys(), key=lambda k: seen[k], reverse=True)
-
-
-def detect_responder(parsed: list[tuple[str, str]], sender_name: str) -> str:
-    """The responder is whoever in the chat is NOT the sender."""
-    participants = detect_participants(parsed)
-    others = [p for p in participants if p != sender_name]
-    if not others:
-        raise ValueError(
-            f"Could not find a responder. SENDER_NAME='{sender_name}' "
-            f"but participants are: {participants}"
-        )
-    return others[0]
 
 
 def build_persona_context(
@@ -110,6 +57,13 @@ Now respond to {sender_name}'s next message as {responder_name}."""
 
 
 def resolve_chat_file(chat_file: str | None) -> str:
+    if CHAT_FILE:
+        if os.path.isabs(CHAT_FILE) and os.path.exists(CHAT_FILE):
+            return CHAT_FILE
+        candidate = os.path.join(CHAT_DIR, CHAT_FILE)
+        if os.path.exists(candidate):
+            return candidate
+    
     if chat_file:
         if os.path.isabs(chat_file) and os.path.exists(chat_file):
             return chat_file
@@ -125,11 +79,11 @@ def resolve_chat_file(chat_file: str | None) -> str:
             return os.path.join(CHAT_DIR, txt_files[0])
         if txt_files:
             raise FileNotFoundError(
-                f"Multiple chat files found: {txt_files}. Specify which one to use."
+                f"Multiple chat files found: {txt_files}. Set CHAT_FILE env var or specify which one to use."
             )
 
     raise FileNotFoundError(
-        f"No chat file found. Place a .txt WhatsApp export in {CHAT_DIR}"
+        f"No chat file found. Place a .txt WhatsApp export in {CHAT_DIR} or set CHAT_FILE env var."
     )
 
 
@@ -201,7 +155,7 @@ async def list_tools() -> list[types.Tool]:
 
 
 @app.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
+async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextContent]:
     if name == "list_chats":
         if not os.path.isdir(CHAT_DIR):
             return [types.TextContent(type="text", text=f"Chat directory not found: {CHAT_DIR}")]
@@ -241,7 +195,7 @@ async def call_tool(name: str, arguments: dict) -> list[types.TextContent]:
         if not SENDER_NAME:
             return [types.TextContent(
                 type="text",
-                text="Error: SENDER_NAME not configured. Set it in mcp.json env for the whatsapp-persona server."
+                text="Error: SENDER_NAME not configured. Set it in .env or mcp.json env."
             )]
 
         message = arguments.get("message", "")

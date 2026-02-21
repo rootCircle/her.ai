@@ -8,7 +8,6 @@ use whatsapp_chat_parser::{
     get_unique_author, parse_chats_log, Author, Message, WhatsAppChatMessage,
 };
 
-const DEFAULT_WHATSAPP_FILENAME: &str = "chat.txt";
 const DISPLAY_CHATS: bool = false;
 const MINIMUM_USER_ACTIVITY_PER_DAY_CHAT_COUNT: usize = 100;
 const MINIMUM_CONVERSATION_FREQUENCY_PER_DAY_CHAT_COUNT: usize = 150;
@@ -27,9 +26,15 @@ struct SentimentData {
 fn main() -> io::Result<()> {
     let start_time = Instant::now();
     let args: Vec<String> = env::args().collect();
-    let filename = args
-        .get(1)
-        .map_or(DEFAULT_WHATSAPP_FILENAME, String::as_str);
+    
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file>", args[0]);
+        eprintln!("Analyzes WhatsApp chat messages for various metrics");
+        eprintln!("Example: cargo run --bin analysis chat.txt");
+        std::process::exit(1);
+    }
+    
+    let filename = &args[1];
 
     let chat = parse_chats_log(filename)?;
 

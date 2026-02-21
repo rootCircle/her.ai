@@ -9,7 +9,23 @@ uv sync
 cp .sample.env .env
 ```
 
-Replace the API Key with the real API key in `.env` file.
+Edit `.env` and add your API keys and configuration.
+
+For MCP server setup (Cursor/VS Code), copy the sample MCP config:
+
+```bash
+# At project root
+# For VS Code
+cp .vscode/mcp.sample.json .vscode/mcp.json
+
+# For Cursor
+cp .cursor/mcp.sample.json .cursor/mcp.json
+```
+
+Edit the copied `mcp.json` and update:
+- The absolute path to your `whatrag` directory
+- `SENDER_NAME`: Your name as it appears in the chat
+- `CHAT_FILE`: (Optional) Specific chat file to use from `chat_files/`. If not set, auto-detects single .txt file
 
 ## Approaches
 
@@ -25,28 +41,11 @@ An MCP server that lets Cursor's built-in LLM role-play as a WhatsApp persona. N
 
 **Setup:**
 
-1. Place your WhatsApp chat export in `Whatsapp_Chats/chat.txt`
+1. Make sure you've completed the main setup steps (see above)
 
-2. Add to `~/.cursor/mcp.json`:
-```json
-{
-  "her-mcp": {
-    "command": "/path/to/uv",
-    "args": [
-      "run",
-      "--project",
-      "/path/to/whatrag",
-      "python",
-      "/path/to/whatrag/mcp_server.py"
-    ],
-    "env": {
-      "SENDER_NAME": "Your Name As It Appears In Chat"
-    }
-  }
-}
-```
+2. Configuration is already in `.vscode/mcp.json` or `.cursor/mcp.json` (copied from `.sample` files)
 
-3. Restart Cursor. Type `me: hi` in chat to start talking to the persona.
+3. Restart Cursor/VS Code. Type `me: hi` in chat to start talking to the persona.
 
 **Tools exposed:**
 | Tool | Description |

@@ -1,4 +1,5 @@
 import os
+from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_core.output_parsers import StrOutputParser
@@ -7,35 +8,59 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.prompts import PromptTemplate
-from dotenv import load_dotenv
+from chat_utils import CHAT_DIR
 
-# Load environment variables from .env files
-load_dotenv()
+# Load .env from project root
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 # Constants
 MODEL_NAME = "gpt-4o"  # The LLM model name
-WHATSAPP_CHAT_DIR = "./Whatsapp_Chats"  # Directory where WhatsApp chat files are stored
 CHAT_FILE_PATTERN = "*.txt"  # File pattern for WhatsApp chat files
 CHUNK_SIZE = 5000  # Size of each text chunk
 CHUNK_OVERLAP = 400  # Overlap between text chunks
 VECTOR_SEARCH_K = 15  # Number of similar chunks to retrieve during search
 
-SENDER_NAME = os.environ.get("SENDER_NAME", "")
-RESPONDER_NAME = os.environ.get("RESPONDER_NAME", "")
+# Validate required environment variables
+SENDER_NAME = os.environ.get("SENDER_NAME", "").strip()
+if not SENDER_NAME:
+    print("Error: SENDER_NAME environment variable is required.")
+    print("Please set it in .env file at project root.")
+    exit(1)
+
+RESPONDER_NAME = os.environ.get("RESPONDER_NAME", "").strip()
+if not RESPONDER_NAME:
+    print("Error: RESPONDER_NAME environment variable is required.")
+    print("Please set it in .env file at project root.")
+    exit(1)
+
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "").strip()
+if not OPENAI_API_KEY:
+    print("Error: OPENAI_API_KEY environment variable is required.")
+    print("Please set it in .env file at project root.")
+    exit(1)
 
 # Initialize the LLM with model constants
-llm = ChatOpenAI(model=MODEL_NAME, temperature=0, max_tokens=None, timeout=None)
+llm = ChatOpenAI(model=MODEL_NAME, temperature=0, timeout=None)
 
-# Load documents from WhatsApp chat files
-loader = DirectoryLoader(WHATSAPP_CHAT_DIR, glob=CHAT_FILE_PATTERN, loader_cls=TextLoader)
+# Load documents from WhatsApp chat files in chat_files directory
+print(f"Loading chat files from: {CHAT_DIR}")
+loader = DirectoryLoader(CHAT_DIR, glob=CHAT_FILE_PATTERN, loader_cls=TextLoader)
 docs = loader.load()
+
+if not docs:
+    print(f"Error: No chat files found in {CHAT_DIR}")
+    print("Please add .txt chat files to the directory.")
+    exit(1)
+
+print(f"Loaded {len(docs)} chat files")
 
 # Split the documents into smaller chunks for efficient processing
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=CHUNK_SIZE, chunk_overlap=CHUNK_OVERLAP)
 splits = text_splitter.split_documents(docs)
 
 # Create a vector store for document embeddings using OpenAI
-vectorstore = Chroma.from_documents(documents=splits, embedding=OpenAIEmbeddings())
+vectorstore = Chroma.from_documents(splits, OpenAIEmbeddings())
 
 # Create a retriever for retrieving relevant document chunks
 retriever = vectorstore.as_retriever(search_type="similarity", search_kwargs={"k": VECTOR_SEARCH_K})

@@ -4,13 +4,17 @@ use tiktoken_rs::num_tokens_from_messages;
 use tiktoken_rs::ChatCompletionRequestMessage;
 use whatsapp_chat_parser::{parse_chats_log, Author, Message};
 
-const DEFAULT_WHATSAPP_FILENAME: &str = "chat.txt";
-
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    let filename = args
-        .get(1)
-        .map_or(DEFAULT_WHATSAPP_FILENAME, String::as_str);
+    
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file>", args[0]);
+        eprintln!("Counts tokens in WhatsApp chat for GPT models");
+        eprintln!("Example: cargo run --bin token_count chat.txt");
+        std::process::exit(1);
+    }
+    
+    let filename = &args[1];
 
     let chat = parse_chats_log(filename)?;
     let mut messages = vec![];

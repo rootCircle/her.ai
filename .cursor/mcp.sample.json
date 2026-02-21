@@ -10,7 +10,8 @@
         "whatrag/mcp_server.py"
       ],
       "env": {
-        "SENDER_NAME": ""
+        "SENDER_NAME": "",
+        "CHAT_FILE": ""
       }
     }
   }

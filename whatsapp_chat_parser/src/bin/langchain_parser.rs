@@ -3,13 +3,17 @@ use std::env;
 use std::io;
 use whatsapp_chat_parser::{parse_chats_log, Author, Message};
 
-const DEFAULT_WHATSAPP_FILENAME: &str = "chat.txt";
-
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().collect();
-    let filename = args
-        .get(1)
-        .map_or(DEFAULT_WHATSAPP_FILENAME, String::as_str);
+    
+    if args.len() < 2 {
+        eprintln!("Usage: {} <input_file>", args[0]);
+        eprintln!("Converts WhatsApp chat from [date, time] format to LangChain format");
+        eprintln!("Example: cargo run --bin langchain_parser chat.txt > output.txt");
+        std::process::exit(1);
+    }
+    
+    let filename = &args[1];
 
     let chat = parse_chats_log(filename)?;
 
@@ -18,9 +22,9 @@ fn main() -> io::Result<()> {
             match &msg.message {
                 Message::Conversation(conversation) | Message::EditedConversation(conversation) => {
                     println!(
-                        "{} {}: {}",
+                        "{} - {}: {}",
                         msg.datetime
-                            .format("[%-m/%-d/%y, %-I:%M:%S %p]")
+                            .format("%-m/%-d/%y, %-I:%M %p")
                             .to_string()
                             .magenta(),
                         username.green(),

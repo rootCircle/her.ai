@@ -1,56 +1,140 @@
-## Project Overview
+# her.ai
 
-This project aims to build a chat AI that mimics the communication style and behavior of a specific person (let's call them Person X) based on their chat history. Users can interact with the AI through conversation prompts, and the AI will respond in a way that reflects Person X's characteristic tone, vocabulary, and conversational patterns.
+Chat with your WhatsApp contacts as AI personas using their real message history. Integrates with Cursor/VS Code via Model Context Protocol (MCP).
 
-## Setup
+## Overview
+
+her.ai creates AI personas that mimic your WhatsApp contacts' texting styles based on their actual chat history. Use it through:
+
+- **MCP Server** - Chat in Cursor/VS Code with `me: your message` syntax
+- **CLI Chat** - Interactive terminal conversations
+
+## Quick Start
+
+### 1. Export Your WhatsApp Chat
+
+On your phone:
+
+1. Open WhatsApp chat
+2. Tap ⋮ (menu) → **More** → **Export chat**
+3. Choose **Without Media**
+4. Save/email the `.txt` file to your computer
+
+### 2. Setup Project
 
 ```bash
-git clone --recursive git@github.com:rootCircle/hear.ai.git
-git submodule update --init
-
+git clone --recursive https://github.com/rootCircle/her.ai.git
+cd her.ai
 ```
 
-## Approach
+### 3. Convert Chat Format
 
-The approach will leverage a combination of deep learning techniques to achieve this goal:
+WhatsApp exports use `[date, time]` format. Convert to LangChain format:
 
-1. **Recurrent Neural Networks (RNNs):** We will use RNNs, specifically LSTMs (Long Short-Term Memory networks), to process Person X's chat history. LSTMs excel at capturing sequential information, making them well-suited for analyzing conversation history and understanding the nuances of Person X's communication style.
+```bash
+cd whatsapp_chat_parser
+cargo run --release --bin langchain_parser "path/to/WhatsApp Chat.txt" > "../chat_files/chat_converted.txt"
+```
 
-2. **Generative AI (GenAI):**  A GenAI model will be trained on the outputs from the RNN. GenAI excels at generating different creative text formats, and in this case, it will be used to create chat responses that mimic Person X's way of communicating.
+### 4. Configure Environment
 
-3. **Sentiment Analysis:**  We will incorporate sentiment analysis to understand the emotional tone of Person X's messages in the chat history. This information will be used by the GenAI model to generate responses that maintain the appropriate sentiment (happy, sarcastic, informative, etc.)
+Copy `.sample.env` to `.env` at project root:
 
-4. **Additional Techniques:** 
+```bash
+cp .sample.env .env
+```
 
-    * **Conditional Text Generation:**  The GenAI model will be conditioned on prompts or contexts provided by the user. This allows the AI to tailor its responses to specific situations, even if they weren't explicitly encountered in the training data.
-    * **Style Transfer:**  Style transfer techniques can be employed within the GenAI model to ensure the generated responses maintain Person X's characteristic writing style.
+Edit `.env`:
 
-##  Data Preprocessing
+```bash
+SENDER_NAME=YourName              # Your name as it appears in chat
+CHAT_FILE=chat_converted.txt      # Converted chat file name
+GOOGLE_API_KEY=your_key_here      # For Gemini (only for CLI chat)
+```
 
-* Person X's chat history will be collected with their consent.
-* The data will be preprocessed to clean it. This might involve removing irrelevant information like timestamps, formatting inconsistencies, and typos.
+### 5. Configure MCP (for Cursor/VS Code)
 
-##  Model Training
+Copy the sample MCP config:
 
-* The preprocessed chat history will be split into training and testing sets.
-* The RNN model will be trained on the training data. This allows the RNN to learn the patterns and relationships between words in Person X's conversations.
-* The outputs from the trained RNN will be used to train the GenAI model. This allows the GenAI model to learn how to generate text that reflects Person X's communication style.
+```bash
+# For VS Code
+cp .vscode/mcp.sample.json .vscode/mcp.json
 
-##  Testing and Evaluation
+# For Cursor
+cp .cursor/mcp.sample.json .cursor/mcp.json
+```
 
-* The model will be evaluated on the testing set to assess its ability to mimic Person X's behavior in new conversation scenarios. 
-*  Metrics used for evaluation might include:
-    *  **BLEU Score:** Measures how similar the AI's generated responses are to actual messages from Person X.
-    * **Human Evaluation:**  User studies  can be conducted to gather feedback on how well the AI captures Person X's personality and communication style.
+Edit the copied `mcp.json` and update:
+- The absolute path to your `her.ai/whatrag` directory
+- `SENDER_NAME`: Your name as it appears in the chat
+- `CHAT_FILE`: (Optional) Specific chat file to use. If not set, auto-detects single .txt file in chat_files/
 
-##  Integration and Deployment
+### 6. Install Python Dependencies
 
-* Once satisfied with the model's performance, it will be integrated into a chatbot interface. Users can interact with the AI through text prompts, and the AI will respond in a way that mimics Person X.
+```bash
+cd whatrag
+uv sync
+```
 
-##  Limitations and Considerations
+## Usage
 
-* The model's ability to mimic Person X will be limited by the size and diversity of the chat history data.
-* The AI might struggle with understanding intent, sarcasm, and common-sense reasoning.
-*  Biases present in Person X's chat history could be inherited by the AI model.  
+### MCP Server (Cursor/VS Code)
 
-We will explore techniques like  data augmentation and human oversight to mitigate these limitations and create a more robust and nuanced AI chatbot.
+The MCP server is configured in `.vscode/mcp.json` or `.cursor/mcp.json` (copied from `.sample` files):
+
+```json
+{
+  "mcpServers": {
+    "her-mcp": {
+      "command": "uv",
+      "args": ["--directory", "/absolute/path/to/her.ai/whatrag", "run", "mcp_server.py"],
+      "env": {
+        "SENDER_NAME": "YourName",
+        "CHAT_FILE": "chat_converted.txt"
+      }
+    }
+  }
+}
+```
+
+**Usage in chat:**
+
+```
+me: hey what's up
+```
+
+The AI responds as your contact, matching their style, slang, emoji usage, etc.
+
+### CLI Interactive Chat
+
+```bash
+cd whatrag
+uv run cli_chat.py
+```
+
+Type messages and the AI responds as the detected persona from your chat history.
+
+## Tools
+
+### WhatsApp Chat Parser (Rust)
+
+Located in `whatsapp_chat_parser/`:
+
+- **langchain_parser** - Convert WhatsApp format to LangChain format
+- **analysis** - Analyze chat metrics, sentiment, activity patterns
+- **token_count** - Count tokens for GPT models
+- **finetune_preprocess** - Prepare chat data for LLM fine-tuning
+
+See [whatsapp_chat_parser/README.md](whatsapp_chat_parser/README.md) for details.
+
+## Requirements
+
+- **Rust** (for chat parser)
+- **Python 3.11+**
+- **uv** (Python package manager)
+- **Ollama** (optional, for local RAG)
+- **API Keys** (Gemini/OpenAI for LLM access)
+
+## License
+
+See [LICENSE](LICENSE) file.
