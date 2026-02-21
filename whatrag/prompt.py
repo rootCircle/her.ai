@@ -1,24 +1,76 @@
+import os
+import re
 import time
-from langchain_community.chat_loaders.whatsapp import WhatsAppChatLoader
-from langchain_community.chat_loaders.utils import map_ai_messages, merge_chat_runs
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_google_genai import (
     ChatGoogleGenerativeAI,
     HarmBlockThreshold,
     HarmCategory,
 )
-from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv()
-# Define constants for various parameters
-SENDER_NAME = "Himan >_<"
-RESPONDER_NAME = "her_name"
-CHAT_FILENAME = "./Whatsapp_Chats/chate.txt"
-MODEL_NAME = "gemini-2.0-flash-exp"
-TEMPERATURE = 0
 
-# Initialize the LLM with Gemini model
+SENDER_NAME = os.environ.get("SENDER_NAME", "")
+RESPONDER_NAME = os.environ.get("RESPONDER_NAME", "")
+CHAT_FILENAME = "./Whatsapp_Chats/chat.txt"
+MODEL_NAME = "gemini-2.5-flash"
+TEMPERATURE = 0.7
+MAX_HISTORY_MESSAGES = 600
+
+MSG_PATTERN = re.compile(
+    r"^(\d{1,2}/\d{1,2}/\d{2,4},\s*\d{1,2}:\d{2}\s*[ap]m)\s*-\s*(.+?):\s*(.+)$",
+    re.IGNORECASE,
+)
+
+SKIP_PHRASES = {
+    "<media omitted>",
+    "you deleted this message",
+    "this message was deleted",
+    "messages and calls are end-to-end encrypted",
+    "null",
+}
+
+
+def parse_whatsapp_chat(filepath):
+    messages = []
+    current_sender = None
+    current_text = None
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.rstrip("\n")
+            match = MSG_PATTERN.match(line)
+            if match:
+                if current_sender and current_text:
+                    messages.append((current_sender, current_text.strip()))
+                current_sender = match.group(2)
+                current_text = match.group(3)
+            elif current_sender:
+                current_text += "\n" + line
+
+    if current_sender and current_text:
+        messages.append((current_sender, current_text.strip()))
+
+    filtered = []
+    for sender, text in messages:
+        if any(skip in text.lower() for skip in SKIP_PHRASES):
+            continue
+        filtered.append((sender, text))
+
+    return filtered
+
+
+def to_langchain_messages(parsed_msgs, sender_name, responder_name):
+    lc_messages = []
+    for sender, text in parsed_msgs:
+        if sender == responder_name:
+            lc_messages.append(AIMessage(content=text))
+        elif sender == sender_name:
+            lc_messages.append(HumanMessage(content=text))
+    return lc_messages
+
+
 llm = ChatGoogleGenerativeAI(
     model=MODEL_NAME,
     temperature=TEMPERATURE,
@@ -34,68 +86,57 @@ llm = ChatGoogleGenerativeAI(
         HarmCategory.HARM_CATEGORY_SEXUAL: HarmBlockThreshold.BLOCK_NONE,
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
     },
-    # max_retries=2,
 )
 
-# Load WhatsApp chat using the defined filename
-loader = WhatsAppChatLoader(path=CHAT_FILENAME)
-raw_messages = loader.lazy_load()
+parsed = parse_whatsapp_chat(CHAT_FILENAME)
+print(f"Parsed {len(parsed)} messages from chat file.")
 
-# Merge consecutive messages from the same sender and convert them to AI messages
-merged_messages = merge_chat_runs(raw_messages)
-messages = list(map_ai_messages(merged_messages, sender=RESPONDER_NAME))
+chat_history = to_langchain_messages(parsed, SENDER_NAME, RESPONDER_NAME)
+print(f"Converted {len(chat_history)} messages (from {SENDER_NAME} and {RESPONDER_NAME}).")
 
-# Initialize the conversation context
-messages_raw = messages[0]["messages"]
-messages_raw.insert(
-    0,
-    SystemMessage(
-        content=f"""You are a participant in a WhatsApp chat between {SENDER_NAME} and {RESPONDER_NAME}. 
-    Your role is to analyze and simulate a natural conversation between these two individuals. You should generate responses 
-    that reflect the tone, personality, and context of a typical WhatsApp chat. Keep the conversation casual, responsive, and engaging, 
-    similar to how people communicate in a text-based messaging environment.
+if len(chat_history) > MAX_HISTORY_MESSAGES:
+    chat_history = chat_history[-MAX_HISTORY_MESSAGES:]
+    print(f"Using the most recent {MAX_HISTORY_MESSAGES} messages as context.")
 
-    - Focus on the relationship dynamics, the subject matter they discuss, and their personalities.
-    - DO NOT continue the conversation beyond the message flow provided. Your task is to generate insights, not to add new dialogue. 
-    - When responding, simulate a friendly, professional, and approachable tone.
-    """,
-    ),
-)
+responder_msgs = [m.content for m in chat_history if isinstance(m, AIMessage) and m.content.strip()]
+style_samples = "\n".join(f"  - \"{msg}\"" for msg in responder_msgs[-60:])
 
-# Start the interactive chat
+system_prompt = f"""You ARE {RESPONDER_NAME}. You are chatting with {SENDER_NAME} on WhatsApp.
+You have a long history with {SENDER_NAME} — you know them well. The chat history below is your REAL conversation with them. You remember everything in it.
+
+Here are examples of how YOU ({RESPONDER_NAME}) actually text:
+{style_samples}
+
+RULES:
+- You ARE {RESPONDER_NAME}. You remember your entire chat history with {SENDER_NAME}. You know who they are, your relationship, your inside jokes, everything.
+- Reply EXACTLY how {RESPONDER_NAME} texts — same language (Hindi/Hinglish/English), same slang, same emoji usage, same message length, same energy.
+- Keep replies short and natural like real WhatsApp texts. No essays.
+- NEVER say you don't know who {SENDER_NAME} is. You know them. You've been chatting with them.
+- NEVER break character. NEVER say you're an AI. NEVER write analysis or commentary.
+- If asked about something from your chat history, recall it naturally like a real person would.
+"""
+
+messages_context = [SystemMessage(content=system_prompt)] + chat_history
+
+print(f"\nLoaded {len(chat_history)} messages as context.")
+print(f"Ready! You are chatting as {SENDER_NAME}. Type 'exit' to quit.\n")
+
 while True:
-    # Get current time for message timestamp
-    current_time = datetime.now().strftime("%m/%d/%Y, %I:%M:%S %p")
-
-    # Add the user input as a prompt to the conversation
-    user_prompt = input(f"{SENDER_NAME}: ")  # Displaying sender's name in the prompt
+    user_prompt = input(f"{SENDER_NAME}: ")
 
     if user_prompt.lower() in ["exit", "quit", "bye"]:
         print("Ending the conversation.")
         break
 
-    # Append the user input message along with the current timestamp
-    messages_raw.append(
-        HumanMessage(
-            content=user_prompt,
-            additional_kwargs={
-                "sender": SENDER_NAME,
-                "events": [
-                    {"message_time": current_time}
-                ],  # Using current time as message_time
-            },
-            role=SENDER_NAME,
-        )
-    )
-    try:
-        # Query Gemini with the updated conversation using langchain
-        response = llm.invoke(messages_raw)
-    except Exception as e:
-        print("Some error")
-        print("I will sleep for 10 sec and retry once")
-        time.sleep(10)
-        response = llm.invoke(messages_raw)
-    messages_raw.append(response)
+    messages_context.append(HumanMessage(content=user_prompt))
 
-    # Print the response from Gemini
-    print(RESPONDER_NAME, ":", response.content)
+    try:
+        response = llm.invoke(messages_context)
+    except Exception as e:
+        print(f"Error: {e}")
+        print("Retrying in 10 seconds...")
+        time.sleep(10)
+        response = llm.invoke(messages_context)
+
+    messages_context.append(response)
+    print(f"{RESPONDER_NAME}: {response.content}")
