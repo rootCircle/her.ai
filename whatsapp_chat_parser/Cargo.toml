@@ -6,11 +6,11 @@ default-run="analysis"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-chrono = "0.4.39"
-colored = "3.0.0"
-regex = "1.11.1"
-serde = { version = "1.0.217", features = ["derive"] }
-serde_json = "1.0.138"
-tempfile = "3.15.0"
-tiktoken-rs = "0.6.0"
-vader-sentimental = "0.1.1"
+chrono = "0.4.43"
+colored = "3.1.1"
+regex = "1.12.3"
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+tempfile = "3.25.0"
+tiktoken-rs = "0.9.1"
+vader-sentimental = "0.1.2"

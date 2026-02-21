@@ -1,0 +1,17 @@
+{
+  "servers": {
+    "her-mcp": {
+      "command": "/usr/bin/uv",
+      "args": [
+        "run",
+        "--project",
+        "whatrag",
+        "python",
+        "whatrag/mcp_server.py"
+      ],
+      "env": {
+        "SENDER_NAME": ""
+      }
+    }
+  }
+}
