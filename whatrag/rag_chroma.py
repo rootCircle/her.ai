@@ -1,3 +1,4 @@
+import os
 from langchain_openai import ChatOpenAI
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain_core.output_parsers import StrOutputParser
@@ -19,8 +20,8 @@ CHUNK_SIZE = 5000  # Size of each text chunk
 CHUNK_OVERLAP = 400  # Overlap between text chunks
 VECTOR_SEARCH_K = 15  # Number of similar chunks to retrieve during search
 
-SENDER_NAME = "Himan >_<"  # Sender name for the context and responses
-RESPONDER_NAME = "her_name"  # Responder name in the final answer
+SENDER_NAME = os.environ.get("SENDER_NAME", "")
+RESPONDER_NAME = os.environ.get("RESPONDER_NAME", "")
 
 # Initialize the LLM with model constants
 llm = ChatOpenAI(model=MODEL_NAME, temperature=0, max_tokens=None, timeout=None)

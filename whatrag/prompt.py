@@ -1,3 +1,4 @@
+import os
 import re
 import time
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -10,8 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SENDER_NAME = "Himan >_<"
-RESPONDER_NAME = "Komal (PGS)"
+SENDER_NAME = os.environ.get("SENDER_NAME", "")
+RESPONDER_NAME = os.environ.get("RESPONDER_NAME", "")
 CHAT_FILENAME = "./Whatsapp_Chats/chat.txt"
 MODEL_NAME = "gemini-2.5-flash"
 TEMPERATURE = 0.7
