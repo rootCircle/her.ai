@@ -101,7 +101,7 @@ async def list_tools() -> list[types.Tool]:
                 "The server knows who the sender is (from config) and auto-detects "
                 "the responder from the chat file. Just pass the message. "
                 "The server remembers prior messages in this session, so the conversation flows naturally. "
-                "After you generate a reply as the persona, call persona_reply to log it so the next call has context. "
+                "After you generate a reply as the persona, pass it as previous_persona_reply on the next call so the server logs it into conversation memory. "
                 "Respond ONLY as the persona — short, natural WhatsApp-style text."
             ),
             inputSchema={
@@ -112,28 +112,13 @@ async def list_tools() -> list[types.Tool]:
                         "type": "string",
                         "description": "The message to send to the persona.",
                     },
+                    "previous_persona_reply": {
+                        "type": "string",
+                        "description": "The exact reply you generated as the persona in the PREVIOUS turn. Pass this so the server logs it into conversation history. On the first message, omit this.",
+                    },
                     "chat_file": {
                         "type": "string",
                         "description": "Optional. Filename of the chat export (e.g. 'chat.txt'). Auto-detected if only one file exists.",
-                    },
-                },
-            },
-        ),
-        types.Tool(
-            name="persona_reply",
-            title="Log Persona Reply",
-            description=(
-                "MUST be called after you generate a reply as the persona. "
-                "Logs the persona's response so the next chat_as_persona call includes it in the conversation history. "
-                "Without this, the persona forgets what it said."
-            ),
-            inputSchema={
-                "type": "object",
-                "required": ["reply"],
-                "properties": {
-                    "reply": {
-                        "type": "string",
-                        "description": "The reply you generated as the persona (exact text you showed the user).",
                     },
                 },
             },
@@ -177,20 +162,6 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
                 results.append(f"- {fname}: error ({e})")
         return [types.TextContent(type="text", text="\n".join(results))]
 
-    if name == "persona_reply":
-        reply = arguments.get("reply", "")
-        if not reply:
-            return [types.TextContent(type="text", text="Error: reply is required.")]
-        try:
-            fpath = resolve_chat_file(arguments.get("chat_file"))
-            parsed = parse_whatsapp_chat(fpath)
-            responder_name = detect_responder(parsed, SENDER_NAME)
-            session_messages.append((responder_name, reply))
-            return [types.TextContent(type="text", text="OK")]
-        except Exception as e:
-            session_messages.append(("persona", reply))
-            return [types.TextContent(type="text", text="OK")]
-
     if name == "chat_as_persona":
         if not SENDER_NAME:
             return [types.TextContent(
@@ -206,6 +177,12 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> list[types.TextCont
             fpath = resolve_chat_file(arguments.get("chat_file"))
             parsed = parse_whatsapp_chat(fpath)
             responder_name = detect_responder(parsed, SENDER_NAME)
+
+            # Log the previous persona reply into session history if provided
+            previous_reply = arguments.get("previous_persona_reply", "")
+            if previous_reply:
+                session_messages.append((responder_name, previous_reply))
+
             context = build_persona_context(parsed, responder_name, SENDER_NAME)
 
             session_messages.append((SENDER_NAME, message))

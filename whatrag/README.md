@@ -48,11 +48,11 @@ An MCP server that lets Cursor's built-in LLM role-play as a WhatsApp persona. N
 3. Restart Cursor/VS Code. Type `me: hi` in chat to start talking to the persona.
 
 **Tools exposed:**
-| Tool | Description |
-|------|-------------|
-| `chat_as_persona` | Send a message, get persona context back for the LLM to reply in-character |
-| `persona_reply` | Log the generated reply so the next call has session context |
-| `list_chats` | List available chat files and participants |
+
+| Tool               | Description                                                                  |
+|--------------------|------------------------------------------------------------------------------|
+| `chat_as_persona`  | Send a message, get persona context back for the LLM to reply in-character   |
+| `list_chats`       | List available chat files and participants                                   |
 
 ### 2. Prompt-based (Gemini API)
 
@@ -81,6 +81,7 @@ uv run ./rag_chroma.py
 ## WhatsApp Chat Export
 
 To export a chat from WhatsApp:
+
 1. Open the chat in WhatsApp
 2. Tap the three dots menu > More > Export chat
 3. Choose "Without media"
