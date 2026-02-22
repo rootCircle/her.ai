@@ -85,4 +85,4 @@ To export a chat from WhatsApp:
 1. Open the chat in WhatsApp
 2. Tap the three dots menu > More > Export chat
 3. Choose "Without media"
-4. Save the `.txt` file to `Whatsapp_Chats/`
+4. Save the `.txt` file to `../chat_files/`
