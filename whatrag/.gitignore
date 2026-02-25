@@ -20,3 +20,6 @@ chat_embeddings/
 
 # Chats
 Whatsapp_Chats/
+
+# Embeddings
+.cache/

@@ -11,11 +11,16 @@ When the user's message starts with `me:` — they are texting and want the What
 
 ## Workflow (follow every time)
 
-1. Call `chat_as_persona` (from the `her-mcp` server) with the message (everything after `me:`).
-   - If this is NOT the first message in the conversation, also pass `previous_persona_reply` with the exact reply you generated last time.
-2. Read the returned context — it has chat history, style examples, and the current session conversation.
-3. Generate a reply ONLY as the persona. Short, natural WhatsApp-style text.
-4. Remember the reply you generated — you will pass it as `previous_persona_reply` on the NEXT `chat_as_persona` call.
+1. Call `init_persona_session` once at the start of a conversation and store the returned `SESSION_ID`.
+2. Call `chat_as_persona` for each user message with that same `session_id`.
+3. If this is NOT the first message in the conversation, also pass `previous_persona_reply` with the exact reply you generated last time.
+4. Read the returned follow-up context and generate a reply ONLY as the persona. Short, natural WhatsApp-style text.
+5. Remember the reply you generated — you will pass it as `previous_persona_reply` on the NEXT `chat_as_persona` call.
+
+## Context behavior
+
+- Keep replies natural. Do not add diagnostics/metrics metadata to the prompt text.
+- Use `include_static_context=true` only when you need to re-anchor style after drift.
 
 ## Rules
 

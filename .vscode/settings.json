@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^python -m py_compile mcp_server\\.py && echo OK$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}
