@@ -25,8 +25,7 @@ def parse_whatsapp_chat(filepath: str) -> list[tuple[str, str]]:
     """
     messages: list[tuple[str, str]] = []
     
-    # Pattern: "1/15/24, 3:42 PM - John: hello there"
-    pattern = re.compile(r'^[\d/]+,\s+[\d:]+\s+[AP]M\s+-\s+([^:]+):\s*(.+)$')
+    pattern = re.compile(r'^[\d/]+,\s+[\d:]+\s+[ap]m\s+-\s+([^:]+):\s*(.+)$', re.IGNORECASE)
     
     with open(filepath, 'r', encoding='utf-8') as f:
         for line in f:
